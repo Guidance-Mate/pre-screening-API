@@ -1,0 +1,23 @@
+{
+    "No Risk": [
+        "The client has no risk of suicidal thoughts or behaviors.",
+        "No immediate concerns related to suicidal thoughts were detected.",
+        "The client appears to be at no risk based on the responses.",
+        "Responses suggest no evidence of suicidal ideation.",
+        "The client exhibits no warning signs for suicidal thoughts."
+    ],
+    "Acute Positive Screen": [
+        "The client is at imminent risk of suicide and requires immediate evaluation.",
+        "An acute positive screen was detected, requiring urgent intervention.",
+        "Immediate mental health safety measures are needed for the client.",
+        "The client shows imminent risk and needs an urgent safety evaluation.",
+        "The responses indicate a critical need for immediate intervention."
+    ],
+    "Non-Acute Positive Screen": [
+        "The client is at potential risk and requires a brief safety assessment.",
+        "Responses suggest a non-acute positive screen for suicidal ideation.",
+        "A brief assessment for suicide risk is recommended for the client.",
+        "The client may benefit from further suicide risk evaluation.",
+        "Potential risk of suicidal ideation requires additional screening."
+    ]
+}
