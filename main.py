@@ -4,34 +4,24 @@ import requests
 import csv
 import json
 import random
-from mangum import Mangum  # Required for AWS Lambda compatibility
+from mangum import Mangum
 
-# Initialize the FastAPI app
+# Initialize FastAPI app
 app = FastAPI()
 
-# Add CORS middleware
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins (use specific origins in production for security)
+    allow_origins=["*"],  
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all HTTP methods
-    allow_headers=["*"],  # Allows all HTTP headers
+    allow_methods=["*"],  
+    allow_headers=["*"],  
 )
 
 # URLs for assessment data
 PHQ9_URL = "https://docs.google.com/spreadsheets/d/1D312sgbt_nOsT668iaUrccAzQ3oByUT0peXS8LYL5wg/export?format=csv"
 ASQ_URL = "https://docs.google.com/spreadsheets/d/1TiU8sv5cJg30ZL3fqPSmBwJJbB7h2xv1NNbKo4ZIydU/export?format=csv"
 BAI_URL = "https://docs.google.com/spreadsheets/d/1f7kaFuhCv6S_eX4EuIrlhZFDR7W5MhQpJSXHznlpJEk/export?format=csv"
-
-# Load phrases
-with open("phrases_phq9.json", "r") as f:
-    phrases_phq9 = json.load(f)
-
-with open("phrases_asq.json", "r") as f:
-    phrases_asq = json.load(f)
-
-with open("phrases_bai.json", "r") as f:
-    phrases_bai = json.load(f)
 
 # Response mappings
 response_mapping_phq9 = {
@@ -97,9 +87,32 @@ def analyze_assessments(first_name: str, last_name: str, middle_name: str = "", 
                 responses = row[1:-4]
                 total_score = sum(response_mapping_phq9.get(r.strip(), 0) for r in responses)
                 interpretation = get_phq9_interpretation(total_score)
-                results["PHQ-9"] = {
+
+                primary_impression = (
+                    "The client may have mild or no mental health concerns."
+                    if interpretation in ["Minimal or none (0-4)", "Mild (5-9)"]
+                    else "The client might be experiencing more significant mental health concerns."
+                )
+
+                additional_impressions = [
+                    "The analysis suggests the client might be experiencing Depression.",
+                    "Physical symptoms may be affecting the client.",
+                    "The client's overall well-being might require attention."
+                ] if interpretation not in ["Minimal or none (0-4)", "Mild (5-9)"] else []
+
+                tool_recommendations = [
+                    "Tools for Depression",
+                    "Tools for Physical Symptoms",
+                    "Tools for Well-Being"
+                ] if interpretation not in ["Minimal or none (0-4)", "Mild (5-9)"] else []
+
+                results["phq9"] = {
+                    "client_name": input_name.title(),
                     "total_score": total_score,
-                    "interpretation": interpretation
+                    "interpretation": interpretation,
+                    "primary_impression": primary_impression,
+                    "additional_impressions": additional_impressions,
+                    "tool_recommendations": tool_recommendations
                 }
                 break
 
@@ -116,17 +129,25 @@ def analyze_assessments(first_name: str, last_name: str, middle_name: str = "", 
                 selected_options = [option.strip() for option in row[2].strip().split(",")]
                 acuity_response = row[5].strip()
 
-                if "None of the above" in selected_options:
-                    interpretation = "No Risk"
-                elif "Yes" in acuity_response:
-                    interpretation = "Acute Positive Screen"
-                else:
-                    interpretation = "Non-Acute Positive Screen"
+                interpretation = "No Risk"
+                primary_impression = "The client has no risk of suicidal thoughts or behaviors."
+                additional_impressions = []
+                suggested_tools = []
 
-                results["ASQ"] = {
+                if "Yes" in acuity_response:
+                    interpretation = "Acute Positive Screen"
+                    primary_impression = "The client is at imminent risk of suicide and requires immediate safety and mental health evaluation."
+                    additional_impressions = ["The client requires a STAT safety/full mental health evaluation."]
+                    suggested_tools = ["Tools for Suicide", "Immediate Mental Health Safety Plan"]
+
+                results["asq"] = {
+                    "client_name": input_name.title(),
                     "selected_options": selected_options,
                     "acuity_response": acuity_response,
-                    "interpretation": interpretation
+                    "interpretation": interpretation,
+                    "primary_impression": primary_impression,
+                    "additional_impressions": additional_impressions,
+                    "suggested_tools": suggested_tools
                 }
                 break
 
@@ -143,19 +164,33 @@ def analyze_assessments(first_name: str, last_name: str, middle_name: str = "", 
                 responses = row[1:-4]
                 total_score = sum(response_mapping_bai.get(r.strip(), 0) for r in responses)
                 interpretation = get_bai_interpretation(total_score)
-                results["BAI"] = {
+
+                primary_impression = "The client may have mild or no anxiety concerns." if interpretation == "Low Anxiety (0-21)" else "The client might be experiencing anxiety or related concerns."
+                additional_impressions = [
+                    "Further evaluation may be needed for Anxiety symptoms.",
+                    "Symptoms of Trauma or PTSD were noted.",
+                    "Youth Mental Health factors may require attention."
+                ] if interpretation != "Low Anxiety (0-21)" else []
+
+                tool_recommendations = [
+                    "Tools for Anxiety",
+                    "Tools for Trauma & PTSD",
+                    "Tools for Youth Mental Health"
+                ] if interpretation != "Low Anxiety (0-21)" else []
+
+                results["bai"] = {
+                    "client_name": input_name.title(),
                     "total_score": total_score,
-                    "interpretation": interpretation
+                    "interpretation": interpretation,
+                    "primary_impression": primary_impression,
+                    "additional_impressions": additional_impressions,
+                    "tool_recommendations": tool_recommendations
                 }
                 break
 
-        if not results:
-            raise HTTPException(status_code=404, detail=f"Client '{input_name}' not found.")
-
-        return {"client_name": input_name.title(), "assessments": results}
+        return results
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing data: {e}")
 
-# AWS Lambda handler
 handler = Mangum(app)
